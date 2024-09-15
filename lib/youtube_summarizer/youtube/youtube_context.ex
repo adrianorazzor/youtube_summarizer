@@ -7,8 +7,6 @@ defmodule YoutubeSummarizer.Youtube do
   alias YoutubeSummarizer.Repo
 
   alias YoutubeSummarizer.Youtube.Video
-  alias YoutubeSummarizer.Youtube.Client
-
 
   def list_videos do
     Repo.all(Video)
@@ -41,10 +39,13 @@ defmodule YoutubeSummarizer.Youtube do
   end
 
   def get_subtitle_text(url, language) do
-    with {:ok, subtitle_text} <- Client.fetch_subtitles(url, language) do
-      %Video{}
-      |> Video.changeset(%{url: url, language: language, subtitle_text: subtitle_text})
-      |> Ecto.Changeset.apply_action(:insert)
+    case YoutubeSummarizer.Youtube.Client.fetch_subtitles(url, language) do
+      {:ok, subtitle_text} ->
+        %Video{}
+        |> Video.changeset(%{url: url, language: language, subtitle_text: subtitle_text})
+        |> Ecto.Changeset.apply_action(:insert)
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 end

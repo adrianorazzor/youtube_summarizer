@@ -33,19 +33,25 @@ defmodule YoutubeSummarizer.Summarization do
   Creates a summary for the given text.
   """
   def create_summary(text) do
-    with {:ok, summary_text} <- Client.summarize(text) do
+   case YoutubeSummarizer.Summarization.Client.summarize(text) do
+    {:ok, summary_text} ->
       %Summary{}
       |> Summary.changeset(%{original_text: text, summary_text: summary_text})
       |> Ecto.Changeset.apply_action(:insert)
-    end
+    {:error, reason} ->
+      {:error, reason}
+   end
   end
 
   @doc """
   Expands the given summary.
   """
   def expand_summary(%Summary{} = summary) do
-    with {:ok, expanted_text} <- Client.expand(summary.summary_text) do
-      {:ok, %{summary | summary_text: expanted_text}}
+    case YoutubeSummarizer.Summarization.Client.expand(summary.summary_text) do
+      {:ok, expandex_text} ->
+        {:ok, %{summary | summary_text: expandex_text}}
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 end
