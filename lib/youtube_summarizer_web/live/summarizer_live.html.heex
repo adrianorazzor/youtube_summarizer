@@ -1,27 +1,33 @@
 <div class="container">
   <h1>YouTube Video Summarizer</h1>
-  <form phx-submit="summarize">
-    <input type="text" name="url" value={@url} placeholder="Enter YouTube URL" required />
-    <select name="language">
-      <option value="en">English</option>
-      <option value="pt">Brazilian Portuguese</option>
-      <option value="es">Spanish</option>
-    </select>
-    <button type="submit">Summarize</button>
-  </form>
 
-  <%= if @summary do %>
-    <div class="summary">
-      <h2>Summary</h2>
-      <p><%= @summary.summary_text %></p>
-      <button phx-click="regenerate">Regenerate</button>
-      <button phx-click="expand">Expand</button>
-    </div>
-  <% end %>
+  <%= if @user do %>
+    <form phx-submit="summarize">
+      <input type="text" name="url" value={@url} placeholder="Enter YouTube URL" required />
+      <select name="language">
+        <option value="en">English</option>
+        <option value="pt">Brazilian Portuguese</option>
+        <option value="es">Spanish</option>
+      </select>
+      <button type="submit">Summarize</button>
+    </form>
 
-  <%= if @error do %>
-    <div class="error">
-      <p><%= @error %></p>
-    </div>
+    <%= if @summary do %>
+      <div class="summary">
+        <h2>Summary</h2>
+        <p><%= @summary.summary_text %></p>
+        <button phx-click="regenerate">Regenerate</button>
+        <button phx-click="expand">Expand</button>
+      </div>
+    <% end %>
+
+    <%= if @error do %>
+      <div class="error">
+        <p>Error: <%= @error %></p>
+      </div>
+    <% end %>
+  <% else %>
+    <p>Please log in to use the YouTube Video Summarizer</p>
+    <a href="/auth/youtube">Login with YouTube</a>
   <% end %>
 </div>

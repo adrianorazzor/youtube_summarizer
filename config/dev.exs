@@ -68,6 +68,8 @@ config :youtube_summarizer, dev_routes: true
 # Do not include metadata nor timestamps in development logs
 config :logger, :console, format: "[$level] $message\n"
 
+config :logger, level: :debug
+
 # Set a higher stacktrace during development. Avoid configuring such
 # in production as building large stacktraces may be expensive.
 config :phoenix, :stacktrace_depth, 20
@@ -84,14 +86,24 @@ config :phoenix_live_view,
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false
 
-#Load environment variables
-if File.exists? (".env") do
-  File.stream!(".env")
-  |> Stream.map(&String.trim/1)
-  |> Enum.each(fn line ->
-    [key, value] = String.split(line, "=")
-    System.put_env(key, value) end)
+# Load environment variables
+youtube_api_key = System.get_env("YOUTUBE_API_KEY")
+anthropic_api_key = System.get_env("ANTHROPIC_API_KEY")
+
+if is_nil(youtube_api_key) do
+  raise "YouTube API key is not set in the environment"
 end
 
-config :youtube_summarizer, youtube_api_key: System.get_env("YOUTUBE_API_KEY")
-config :youtube_summarizer, anthropic_api_key: System.get_env("ANTHROPIC_API_KEY")
+if is_nil(anthropic_api_key) do
+  raise "Anthropic API key is not set in the environment"
+end
+
+
+config :youtube_summarizer,
+  youtube_client_id: System.get_env("YOUTUBE_CLIENT_ID"),
+  youtube_client_secret: System.get_env("YOUTUBE_CLIENT_SECRET"),
+  youtube_redirect_uri: "http://localhost:4000/auth/youtube/callback"
+
+# Print API keys for debugging (remove in production)
+IO.puts "YouTube API Key: #{youtube_api_key}"
+IO.puts "Anthropic API Key: #{anthropic_api_key}"

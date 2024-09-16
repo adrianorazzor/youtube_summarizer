@@ -18,6 +18,14 @@ defmodule YoutubeSummarizerWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+    live "/summarizer", SummarizerLive
+  end
+
+  scope "/auth", YoutubeSummarizerWeb do
+    pipe_through :browser
+
+    get "/youtube", AuthController, :request
+    get "/youtube/callback", AuthController, :callback
   end
 
   # Other scopes may use custom stacks.

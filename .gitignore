@@ -35,6 +35,6 @@ youtube_summarizer-*.tar
 npm-debug.log
 /assets/node_modules/
 
-config.env
+.env
 
 .aider*

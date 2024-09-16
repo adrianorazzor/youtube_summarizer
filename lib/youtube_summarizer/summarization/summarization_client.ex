@@ -44,8 +44,11 @@ defmodule YoutubeSummarizer.Summarization.Client do
         summary = body["content"][0]["text"]
         {:ok, summary}
 
+        {:ok, %{status_code: 429}} ->
+          {:error, "Anthropic rate limit exceeded"}
+
         {:ok, %{status_code: status_code, body: body}} ->
-        {:error, "Anthropic API error: #{status_code}  - #{body["error"]["message"]}"}
+          {:error, "Anthropic API error: #{status_code}  - #{body["error"]["message"]}"}
 
       {:error, %HTTPoison.Error{reason: reason}} ->
         {:error, "HTTP rquest failed: #{reason}"}
@@ -73,6 +76,9 @@ defmodule YoutubeSummarizer.Summarization.Client do
       {:ok, %{status_code: 200, body: body}} ->
         expanded_summary = body["content"][0]["text"]
         {:ok, expanded_summary}
+
+      {:ok, %{status_code: 429}} ->
+        {:error, "Anthropic API rate limit exceeded"}
 
       {:ok, %{status_code: status_code, body: body}} ->
         {:error, "Anthropic API error: #{status_code} - #{body["error"]["message"]}"}

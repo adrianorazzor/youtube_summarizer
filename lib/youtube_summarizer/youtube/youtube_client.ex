@@ -4,96 +4,94 @@ defmodule YoutubeSummarizer.Youtube.Client do
   """
 
   use HTTPoison.Base
+  require Logger
 
-  @base_url "https://googleapis.com/youtube/v3"
+  @base_url "https://www.googleapis.com/youtube/v3"
 
   def process_url(url) do
-    @base_url <> url
+    processed_url = @base_url <> url
+    Logger.debug("Processed URL: #{processed_url}")
+    processed_url
   end
 
-  def process_request_headers(headers) do
-    [{"Content-Type", "application/json"} | headers]
+  def process_request_headers(headers, conn) do
+    access_token = Plug.Conn.get_session(conn, :oauth_token)
+    [{"Authorization", "Bearer #{access_token}"} | headers]
   end
 
   def process_response_body(body) do
-    Jason.decode!(body)
-  end
-
-  @doc """
-    Fetches subtitle text for a given Youtube video URL and language.
-  """
-  def fetch_subtitles(url, language) do
-    with {:ok, video_id} <- extract_video_id(url),
-         {:ok, caption_id} <- get_caption_id(video_id, language),
-         {:ok, subtitle_text} <- get_subtitle_text(caption_id) do
-      {:ok, subtitle_text}
-    else
-      {:error, reason} -> {:error, reason}
+    case Jason.decode(body) do
+      {:ok, decoded} -> decoded
+      {:error, _} -> %{raw_body: body}
     end
   end
 
-  defp extract_video_id(url) do
-    case Regex.run(~r{(?:youtube\.com/watch\?v=|youtu\.be/)([^&\?]+)}, url) do
-      [_, video_id] -> {:ok, video_id}
-      _ -> {:error, "Invalid YoutTube URL"}
+  def fetch_video_data(video_id) do
+    case api_key() do
+      {:ok, key} ->
+        params = [
+          key: key,
+          part: "snippet",
+          id: video_id
+        ]
+        request_with_error_handling("/videos", params)
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
-defp get_caption_id(video_id, language) do
-  params = [
-    part: "snippet",
-    videoId: video_id,
-    key: Application.get_env(:youtube_summarizer, :youtube_api_key)
-  ]
+  def fetch_captions(video_id, conn) do
+    Logger.debug("Fetching captions for video_id: #{video_id}")
+    get("/captions", process_request_headers([], conn), params: [part: "snippet", videoId: video_id])
+    |> handle_response()
+  end
 
-  case get("/captions", [], params: params) do
-    {:ok, %{status_code: 200, body: body}} ->
-      caption = Enum.find(body["items"], fn item ->
-        item["snippet"]["language"] == language
-      end)
 
-      if caption do
-        {:ok, caption["id"]}
-      else
-        {:error, "No captions found for the specified language"}
-      end
 
-      {:ok, %{status_code: status_code, body: body}} ->
-        {:error, "YouTube API error: #{status_code} - #{body["error"]["message"]}"}
+  def fetch_subtitle_content(caption_id, conn) do
+    Logger.debug("Fetching subtitle content for caption_id: #{caption_id}")
+    get("/captions/#{caption_id}", process_request_headers([], conn), params: [tfmt: "srt"])
+    |> handle_response()
+  end
 
+  defp handle_response({:ok, %HTTPoison.Response{status_code: 200, body: body}}) do
+    {:ok, body}
+  end
+
+  defp handle_response({:ok, %HTTPoison.Response{status_code: status_code, body: body}}) do
+    {:error, "YouTube API error (#{status_code}): #{inspect(body)}"}
+  end
+
+  defp handle_response({:error, %HTTPoison.Error{reason: reason}}) do
+    {:error, "HTTP request failed: #{inspect(reason)}"}
+  end
+
+  defp request_with_error_handling(endpoint, params) do
+    Logger.debug("Making request to endpoint: #{endpoint}")
+    Logger.debug("With params: #{inspect(params)}")
+
+    case get(endpoint, [], params: params) do
+      {:ok, %HTTPoison.Response{status_code: 200, body: %{raw_body: raw_body}}} ->
+        {:error, "Unexpected response: #{String.slice(raw_body, 0, 100)}..."}
+      {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
+        {:ok, body}
+      {:ok, %HTTPoison.Response{status_code: status_code, body: %{raw_body: raw_body}}} ->
+        {:error, "YouTube API error (#{status_code}): #{String.slice(raw_body, 0, 100)}..."}
+      {:ok, %HTTPoison.Response{status_code: status_code, body: body}} ->
+        {:error, "YouTube API error (#{status_code}): #{inspect(body)}"}
       {:error, %HTTPoison.Error{reason: reason}} ->
-        {:error, "HTTP request failed: #{reason}"}
+        {:error, "HTTP request failed: #{inspect(reason)}"}
+    end
   end
-end
 
-defp get_subtitle_text(caption_id) do
-  params = [
-    tfmt: "srt",
-    key: Application.get_env(:youtube_summarizer, :youtube_api_key)
-  ]
-
-  case get("/captions/#{caption_id}", [], params: params) do
-    {:ok, %{status_code: 200, body: body}} ->
-      {:ok, parse_srt(body)}
-
-    {:ok, %{status_code: status_code, body: body}} ->
-      {:error, "YouTube API error: #{status_code} - #{body["error"]["message"]}"}
-
-    {:error, %HTTPoison.Error{reason: reason}} ->
-      {:error, "HTTP request failed: #{reason}"}
+  defp api_key do
+    case Application.get_env(:youtube_summarizer, :youtube_api_key) do
+      nil ->
+        Logger.error("YouTube API key is not set")
+        {:error, "YouTube API key is not set"}
+      key ->
+        {:ok, key}
+    end
   end
-end
-
-defp parse_srt(srt_content) do
-  srt_content
-  |> String.split("\n\n")
-  |> Enum.map(fn block ->
-    [_index, _timestamp | text] = String.split(block, "\n")
-    Enum.join(text, " ")
-  end)
-  |> Enum.join(" ")
-  |> String.trim()
-end
-
 
 end
